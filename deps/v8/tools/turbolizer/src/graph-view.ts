@@ -3,15 +3,16 @@
 // found in the LICENSE file.
 
 import * as d3 from "d3"
-import {layoutNodeGraph} from "./graph-layout.js"
-import {MAX_RANK_SENTINEL} from "./constants.js"
-import {GNode, nodeToStr, isNodeInitiallyVisible} from "./node.js"
-import {NODE_INPUT_WIDTH, MINIMUM_NODE_OUTPUT_APPROACH} from "./node.js"
-import {DEFAULT_NODE_BUBBLE_RADIUS} from "./node.js"
-import {Edge, edgeToStr} from "./edge.js"
-import {View, PhaseView} from "./view.js"
-import {MySelection} from "./selection.js"
-import {partial, alignUp} from "./util.js"
+import { layoutNodeGraph } from "../src/graph-layout"
+import { MAX_RANK_SENTINEL } from "../src/constants"
+import { GNode, nodeToStr, isNodeInitiallyVisible } from "../src/node"
+import { NODE_INPUT_WIDTH, MINIMUM_NODE_OUTPUT_APPROACH } from "../src/node"
+import { DEFAULT_NODE_BUBBLE_RADIUS } from "../src/node"
+import { Edge, edgeToStr } from "../src/edge"
+import { View, PhaseView } from "../src/view"
+import { MySelection } from "../src/selection"
+import { partial, alignUp } from "../src/util"
+import { NodeSelectionHandler, ClearableHandler } from "./selection-handler";
 
 function nodeToStringKey(n) {
   return "" + n.id;
@@ -34,7 +35,7 @@ export class GraphView extends View implements PhaseView {
   state: GraphState;
   nodes: Array<GNode>;
   edges: Array<any>;
-  selectionHandler: NodeSelectionHandler;
+  selectionHandler: NodeSelectionHandler&ClearableHandler;
   graphElement: d3.Selection<any, any, any, any>;
   visibleNodes: d3.Selection<any, GNode, any, any>;
   visibleEdges: d3.Selection<any, Edge, any, any>;
@@ -157,14 +158,6 @@ export class GraphView extends View implements PhaseView {
       });
 
 
-    d3.select("#layout").on("click", partial(this.layoutAction, graph));
-    d3.select("#show-all").on("click", partial(this.showAllAction, graph));
-    d3.select("#toggle-hide-dead").on("click", partial(this.toggleHideDead, graph));
-    d3.select("#hide-unselected").on("click", partial(this.hideUnselectedAction, graph));
-    d3.select("#hide-selected").on("click", partial(this.hideSelectedAction, graph));
-    d3.select("#zoom-selection").on("click", partial(this.zoomSelectionAction, graph));
-    d3.select("#toggle-types").on("click", partial(this.toggleTypesAction, graph));
-
     // listen for key events
     d3.select(window).on("keydown", function (e) {
       graph.svgKeyDown.call(graph);
@@ -261,6 +254,13 @@ export class GraphView extends View implements PhaseView {
   }
 
   initializeContent(data, rememberedSelection) {
+    d3.select("#layout").on("click", partial(this.layoutAction, this));
+    d3.select("#show-all").on("click", partial(this.showAllAction, this));
+    d3.select("#toggle-hide-dead").on("click", partial(this.toggleHideDead, this));
+    d3.select("#hide-unselected").on("click", partial(this.hideUnselectedAction, this));
+    d3.select("#hide-selected").on("click", partial(this.hideSelectedAction, this));
+    d3.select("#zoom-selection").on("click", partial(this.zoomSelectionAction, this));
+    d3.select("#toggle-types").on("click", partial(this.toggleTypesAction, this));
     this.createGraph(data, rememberedSelection);
     if (rememberedSelection != null) {
       this.attachSelection(rememberedSelection);
@@ -269,6 +269,11 @@ export class GraphView extends View implements PhaseView {
     } else {
       this.viewWholeGraph();
     }
+  }
+
+  show(data, rememberedSelection): void {
+    this.container.appendChild(this.divNode);
+    this.initializeContent(data, rememberedSelection);
   }
 
   deleteContent() {
@@ -281,12 +286,14 @@ export class GraphView extends View implements PhaseView {
   };
 
   measureText(text) {
-    const textMeasure = document.getElementById('text-measure') as SVGTSpanElement;
-    textMeasure.textContent = text;
-    return {
-      width: textMeasure.getBBox().width,
-      height: textMeasure.getBBox().height,
-    };
+    const textMeasure = document.getElementById('text-measure');
+    if (textMeasure instanceof SVGTSpanElement) {
+      textMeasure.textContent = text;
+      return {
+        width: textMeasure.getBBox().width,
+        height: textMeasure.getBBox().height,
+      };
+    }
   }
 
   createGraph(data, rememberedSelection) {
@@ -342,7 +349,6 @@ export class GraphView extends View implements PhaseView {
     g.updateGraphVisibility();
     g.layoutGraph();
     g.updateGraphVisibility();
-    g.viewWholeGraph();
   }
 
   connectVisibleSelectedNodes() {
